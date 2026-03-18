@@ -1,44 +1,43 @@
 <?php
 /*
 Plugin Name: CopticCal Pro
-Description: Advanced Coptic Calendar with Coptic dates, event highlighting, and "Next Event" display.
-Version: 1.2
+Description: Coptic Calendar with event highlighting, "Next Event" display, and a custom settings menu.
+Version: 1.3
 Author: Joseph Gobran
 */
 
-// --- 1. CORE CALCULATIONS & COPTIC CONVERSION ---
+// --- 1. CORE CALCULATIONS ---
 
-function cff_get_coptic_date($timestamp) {
-    // Basic Gregorian to Coptic conversion (Approximate for 1901-2099)
-    $g_day = (int)date('j', $timestamp);
-    $g_month = (int)date('n', $timestamp);
-    $g_year = (int)date('Y', $timestamp);
-
-    $jd = GregorianToJD($g_month, $g_day, $g_year);
-    // Coptic Epoch is JD 1825030
-    $c_days = $jd - 1825030;
-    
-    $c_year = floor(($c_days) / 365.25);
-    $remaining_days = $c_days - floor($c_year * 365.25);
-    
-    $c_month_num = floor($remaining_days / 30) + 1;
-    $c_day = ($remaining_days % 30) + 1;
-
-    $months = ["Tout", "Baba", "Hator", "Kiahk", "Toba", "Amshir", "Baramhat", "Baramouda", "Bashans", "Paona", "Epep", "Mesra", "Nasie"];
-    
-    // Safety check for the 13th month (Nasie)
-    $month_name = isset($months[$c_month_num - 1]) ? $months[$c_month_num - 1] : "Nasie";
-    
-    return "$c_day $month_name";
+function cff_is_gregorian_leap($year) {
+    return ($year % 4 === 0 && ($year % 100 !== 0 || $year % 400 === 0));
 }
 
-// (Keep existing cff_is_gregorian_leap, cff_is_coptic_leap, cff_julian_easter, etc. from previous version)
-function cff_is_gregorian_leap($year) { return ($year % 4 === 0 && ($year % 100 !== 0 || $year % 400 === 0)); }
-function cff_is_coptic_leap($cy) { return ($cy % 4 === 3); }
+function cff_is_coptic_leap($coptic_year) {
+    return ($coptic_year % 4 === 3);
+}
+
 function cff_julian_easter($year) {
-    $a = $year%4; $b = $year%7; $c = $year%19; $d = (19*$c+15)%30; $e = (2*$a+4*$b-$d+34)%7;
-    $m = floor(($d+$e+114)/31); $day = (($d+$e+114)%31)+1;
-    return strtotime("+13 days", mktime(0,0,0,$m,$day,$year));
+    $a = $year % 4;
+    $b = $year % 7;
+    $c = $year % 19;
+    $d = (19 * $c + 15) % 30;
+    $e = (2 * $a + 4 * $b - $d + 34) % 7;
+    $month = floor(($d + $e + 114) / 31);
+    $day = (($d + $e + 114) % 31) + 1;
+    return strtotime("+13 days", mktime(0, 0, 0, $month, $day, $year));
+}
+
+function cff_format_date($timestamp) {
+    return date("F j", $timestamp);
+}
+
+// FIXED: Correctly handles ranges spanning multiple months
+function cff_format_range($start, $end) {
+    if (date("F", $start) === date("F", $end)) {
+        return date("F j", $start) . "–" . date("j", $end);
+    } else {
+        return date("F j", $start) . " – " . date("F j", $end);
+    }
 }
 
 function cff_calculate_events($year) {
@@ -49,20 +48,37 @@ function cff_calculate_events($year) {
     $great_fast_start = strtotime("-55 days", $pascha);
 
     $events = [
-        ["Nativity Fast (Cont.)", [mktime(0,0,0,1,1,$year), mktime(0,0,0,1,6,$year)]],
-        ["Nativity Feast", $leap ? [mktime(0,0,0,1,7,$year), mktime(0,0,0,1,8,$year)] : mktime(0,0,0,1,7,$year)],
-        ["Epiphany (Theophany)", mktime(0,0,0,1,$leap?20:19,$year)],
-        ["Jonah's Fast", [strtotime("-14 days", $great_fast_start), strtotime("-12 days", $great_fast_start)]],
+        ["The Holy Nativity Fast", [mktime(0, 0, 0, 1, 1, $year), mktime(0, 0, 0, 1, 6, $year)]],
+        ["The Holy Nativity Feast", $leap ? [mktime(0, 0, 0, 1, 7, $year), mktime(0, 0, 0, 1, 8, $year)] : mktime(0, 0, 0, 1, 7, $year)],
+        ["The Circumcision Feast", mktime(0, 0, 0, 1, $leap ? 15 : 14, $year)],
+        ["The Holy Epiphany", mktime(0, 0, 0, 1, $leap ? 20 : 19, $year)],
+        ["Feast of the Wedding of Cana of Galilee", mktime(0, 0, 0, 1, $leap ? 22 : 21, $year)],
+        ["Jonah's (Nineveh) Fast", [strtotime("-14 days", $great_fast_start), strtotime("-12 days", $great_fast_start)]],
+        ["Jonah's (Nineveh) Feast", strtotime("-11 days", $great_fast_start)],
+        ["Presentation of the Lord into the Temple", mktime(0, 0, 0, 2, $leap ? 16 : 15, $year)],
         ["Holy Great Fast", [$great_fast_start, strtotime("-9 days", $pascha)]],
-        ["Hosanna Sunday", strtotime("-7 days", $pascha)],
-        ["Holy Pascha Week", [strtotime("-6 days", $pascha), strtotime("-4 days", $pascha)]],
-        ["Resurrection Feast", $pascha],
-        ["Ascension Feast", strtotime("+39 days", $pascha)],
-        ["Pentecost Feast", strtotime("+49 days", $pascha)],
-        ["Apostles' Fast", [strtotime("+50 days", $pascha), mktime(0,0,0,7,11,$year)]],
-        ["St. Mary's Fast", [mktime(0,0,0,8,7,$year), mktime(0,0,0,8,21,$year)]],
-        ["Nayrouz (Coptic New Year)", mktime(0,0,0,9,$cleap?12:11,$year)],
-        ["Nativity Fast", [mktime(0,0,0,11,$cleap?26:25,$year), mktime(0,0,0,1,6,$year+1)]],
+        ["The Feast of the Cross", mktime(0, 0, 0, 3, 19, $year)],
+        ["Annunciation Feast", mktime(0, 0, 0, 4, 7, $year)],
+        ["Lazarus Saturday", strtotime("-8 days", $pascha)],
+        ["Entry of our Lord into Jerusalem (Hosanna Sunday)", strtotime("-7 days", $pascha)],
+        ["Holy Pascha", [strtotime("-6 days", $pascha), strtotime("-4 days", $pascha)]],
+        ["Covenant Thursday", strtotime("-3 days", $pascha)],
+        ["Good Friday", strtotime("-2 days", $pascha)],
+        ["Glorious Feast of the Resurrection", $pascha],
+        ["Feast of St. George", mktime(0, 0, 0, 5, 1, $year)],
+        ["Thomas' Sunday", strtotime("+7 days", $pascha)],
+        ["Martyrdom of St. Mark the Evangelist", mktime(0, 0, 0, 5, 8, $year)],
+        ["The Holy Feast of Ascension", strtotime("+39 days", $pascha)],
+        ["Entry of the Lord into Egypt", mktime(0, 0, 0, 6, 1, $year)],
+        ["The Holy Pentecost Feast", strtotime("+49 days", $pascha)],
+        ["The Apostles' Fast", [strtotime("+50 days", $pascha), mktime(0, 0, 0, 7, 11, $year)]],
+        ["The Apostles' Feast (Martyrdom of St. Peter & St. Paul)", mktime(0, 0, 0, 7, 12, $year)],
+        ["St. Mary's Fast", [mktime(0, 0, 0, 8, 7, $year), mktime(0, 0, 0, 8, 21, $year)]],
+        ["Transfiguration Feast", mktime(0, 0, 0, 8, 19, $year)],
+        ["Assumption of St. Mary's Body", mktime(0, 0, 0, 8, 22, $year)],
+        ["The Nayrouz Feast (Coptic New Year)", mktime(0, 0, 0, 9, $cleap ? 12 : 11, $year)],
+        ["The Feast of the Cross (Three days)", [mktime(0, 0, 0, 9, $cleap ? 28 : 27, $year), mktime(0, 0, 0, 9, ($cleap ? 28 : 27) + 2, $year)]],
+        ["The Holy Nativity Fast", [mktime(0, 0, 0, 11, $cleap ? 26 : 25, $year), mktime(0, 0, 0, 1, 6, $year + 1)]],
     ];
 
     usort($events, function($a, $b) {
@@ -73,14 +89,12 @@ function cff_calculate_events($year) {
     return $events;
 }
 
-// --- 2. SETTINGS PAGE (Feature 7) ---
+// --- 2. SETTINGS PAGE ---
 
 add_action('admin_init', 'cff_settings_init');
 function cff_settings_init() {
     register_setting('cff_settings', 'cff_highlight_color');
-    register_setting('cff_settings', 'cff_show_coptic');
-    add_option('cff_highlight_color', '#fff9c4'); // Default light yellow
-    add_option('cff_show_coptic', '1');
+    add_option('cff_highlight_color', '#fff9c4'); 
 }
 
 add_action('admin_menu', 'cff_add_admin_menu');
@@ -99,10 +113,6 @@ function cff_render_settings() {
                     <th scope="row">Highlight Today Color</th>
                     <td><input type="color" name="cff_highlight_color" value="<?php echo esc_attr(get_option('cff_highlight_color')); ?>"></td>
                 </tr>
-                <tr>
-                    <th scope="row">Show Coptic Dates</th>
-                    <td><input type="checkbox" name="cff_show_coptic" value="1" <?php checked(get_option('cff_show_coptic'), '1'); ?>></td>
-                </tr>
             </table>
             <?php submit_button(); ?>
         </form>
@@ -110,7 +120,7 @@ function cff_render_settings() {
     <?php
 }
 
-// --- 3. RENDERING (Features 1 & 2) ---
+// --- 3. RENDERING ---
 
 function cff_render_table($atts) {
     $atts = shortcode_atts(['year' => date("Y")], $atts);
@@ -118,38 +128,31 @@ function cff_render_table($atts) {
     $events = cff_calculate_events($year);
     $today = strtotime('today');
     $highlight = get_option('cff_highlight_color');
-    $show_coptic = get_option('cff_show_coptic');
 
     $output = "<table style='width: 100%; border-collapse: collapse; text-align: left;'>";
     $output .= "<thead><tr style='border-bottom: 2px solid #ccc;'>
-                <th style='padding:10px;'>Event</th>
-                <th style='padding:10px;'>Gregorian Date</th>";
-    if($show_coptic) $output .= "<th style='padding:10px;'>Coptic Date</th>";
-    $output .= "</tr></thead><tbody>";
+                <th style='padding:10px; text-align: left;'>Fast or Feast ($year)</th>
+                <th style='padding:10px; text-align: left;'>Date</th>
+                </tr></thead><tbody>";
 
     foreach ($events as [$name, $date]) {
         $start = is_array($date) ? $date[0] : $date;
         $end = is_array($date) ? $date[1] : $date;
         
-        // Feature 1: Highlight logic
         $is_today = ($today >= $start && $today <= $end);
         $style = $is_today ? "background-color: $highlight; font-weight: bold;" : "border-bottom: 1px solid #eee;";
 
         $output .= "<tr style='$style'>";
-        $output .= "<td style='padding:8px;'>$name " . ($is_today ? "⭐" : "") . "</td>";
-        $output .= "<td style='padding:8px;'>" . (is_array($date) ? date("M j", $start)."–".date("j", $end) : date("M j", $start)) . "</td>";
+        $output .= "<td style='padding:8px; text-align: left;'>$name " . ($is_today ? "⭐" : "") . "</td>";
         
-        // Feature 2: Coptic column
-        if($show_coptic) {
-            $output .= "<td style='padding:8px;'>" . cff_get_coptic_date($start) . "</td>";
-        }
+        // FIXED: Using cff_format_range to properly handle multi-month ranges
+        $formatted_date = is_array($date) ? cff_format_range($date[0], $date[1]) : cff_format_date($date);
+        $output .= "<td style='padding:8px; text-align: left;'>$formatted_date</td>";
         $output .= "</tr>";
     }
     $output .= "</tbody></table>";
     return $output;
 }
-
-// --- 4. NEXT EVENT SHORTCODE (Feature 6) ---
 
 function cff_render_next_event() {
     $events = cff_calculate_events(date('Y'));
@@ -157,8 +160,11 @@ function cff_render_next_event() {
     
     foreach ($events as [$name, $date]) {
         $start = is_array($date) ? $date[0] : $date;
-        if ($start >= $today) {
-            return "<div class='cff-next'><strong>Next:</strong> $name (" . date("M j", $start) . ")</div>";
+        $end = is_array($date) ? $date[1] : $date;
+        // If the event is happening now or in the future
+        if ($end >= $today) {
+            $formatted_date = is_array($date) ? cff_format_range($date[0], $date[1]) : cff_format_date($date);
+            return "<div class='cff-next'><strong>Coming Up:</strong> $name ($formatted_date)</div>";
         }
     }
     return "";
@@ -166,4 +172,4 @@ function cff_render_next_event() {
 
 add_shortcode('cff_table', 'cff_render_table');
 add_shortcode('cff_next', 'cff_render_next_event');
-add_shortcode('cff_today', 'cff_current_event_shortcode'); // (Previous code)
+add_shortcode('cff_today', 'cff_render_next_event'); // Aliasing today to next event for better UX
