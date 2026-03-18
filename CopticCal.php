@@ -1,8 +1,8 @@
 <?php
 /*
 Plugin Name: CopticCal
-Description: Displays Coptic fasts and feasts for a given Gregorian year in a simple table (horizontal lines only).
-Version: 1.0
+Description: Displays Coptic fasts and feasts for a given Gregorian year in a simple table with left-aligned titles.
+Version: 1.1
 Author: Joseph Gobran
 */
 
@@ -55,8 +55,7 @@ function cff_calculate_events($year) {
     $jonah_feast = strtotime("+3 days", $jonah_fast_start);
     
     $events = [
-        // ADDED: Continuation of the Nativity fast from the previous year
-        ["The Holy Nativity Fast", [mktime(0, 0, 0, 1, 1, $year), mktime(0, 0, 0, 1, 6, $year)]],
+        ["The Holy Nativity Fast (Continuation)", [mktime(0, 0, 0, 1, 1, $year), mktime(0, 0, 0, 1, 6, $year)]],
         ["The Holy Nativity Feast", $leap ? [mktime(0, 0, 0, 1, 7, $year), mktime(0, 0, 0, 1, 8, $year)] : mktime(0, 0, 0, 1, 7, $year)],
         ["The Circumcision Feast", mktime(0, 0, 0, 1, $leap ? 15 : 14, $year)],
         ["The Holy Epiphany", mktime(0, 0, 0, 1, $leap ? 20 : 19, $year)],
@@ -92,51 +91,38 @@ function cff_calculate_events($year) {
     usort($events, function($a, $b) {
         $dateA = is_array($a[1]) ? $a[1][0] : $a[1];
         $dateB = is_array($b[1]) ? $b[1][0] : $b[1];
-        // FIXED: Using spaceship operator for safer comparison
-        return $dateA <=> $dateB; 
+        return $dateA <=> $dateB;
     });
 
     return $events;
 }
+
 function cff_render_table($atts) {
-    // 1. Set the default year from the shortcode attribute or current year
     $atts = shortcode_atts(['year' => date("Y")], $atts);
     $year = intval($atts['year']);
-    
-    // 2. Check if the user has submitted a new year via the input box
-    if (isset($_POST['cff_year']) && intval($_POST['cff_year']) > 0) {
-        $year = intval($_POST['cff_year']);
-    }
-
-    // 3. Calculate the events for the determined year
     $events = cff_calculate_events($year);
 
-    // 4. Build the output (Form + Table)
-    $output = "<div class='cff-calendar-container'>";
-    
-    // The Year Input Form
-    $output .= "<form method='POST' action='' class='cff-year-form' style='margin-bottom: 20px;'>";
-    $output .= "<label for='cff_year_input'><strong>Select Year: </strong></label>";
-    $output .= "<input type='number' id='cff_year_input' name='cff_year' value='" . esc_attr($year) . "' required min='1900' max='2200' style='width: 100px; padding: 5px; margin-right: 10px;'>";
-    $output .= "<button type='submit' style='padding: 5px 15px;'>Generate Calendar</button>";
-    $output .= "</form>";
-
-    // The Calendar Table
-    $output .= "<table class='cff-table' style='width: 100%; text-align: left; border-collapse: collapse;'>";
-    // Appended the selected year to the header so the user knows what they are looking at
-    $output .= "<thead><tr><th style='border-bottom: 2px solid #ccc; padding-bottom: 10px;'>Fast or Feast ($year)</th><th style='border-bottom: 2px solid #ccc; padding-bottom: 10px;'>Date</th></tr></thead>";
+    $output = "<table class='cff-table' style='width: 100%; border-collapse: collapse; text-align: left;'>";
+    $output .= "<thead>
+                    <tr>
+                        <th style='border-bottom: 2px solid #ccc; padding: 10px 0; text-align: left;'>Fast or Feast ($year)</th>
+                        <th style='border-bottom: 2px solid #ccc; padding: 10px 0; text-align: left;'>Date</th>
+                    </tr>
+                </thead>";
     $output .= "<tbody>";
 
     foreach ($events as [$name, $date]) {
         $formatted = is_array($date) ? cff_format_range($date[0], $date[1]) : cff_format_date($date);
-        $output .= "<tr><td style='border-bottom: 1px solid #eee; padding: 8px 0;'>$name</td><td style='border-bottom: 1px solid #eee; padding: 8px 0;'>$formatted</td></tr>";
+        $output .= "<tr>
+                        <td style='border-bottom: 1px solid #eee; padding: 8px 0; text-align: left;'>$name</td>
+                        <td style='border-bottom: 1px solid #eee; padding: 8px 0; text-align: left;'>$formatted</td>
+                    </tr>";
     }
 
     $output .= "</tbody></table>";
-    $output .= "</div>";
-
     return $output;
 }
+
 function cff_current_event_shortcode() {
     $year = (int)date('Y');
     $today = mktime(0, 0, 0, date('n'), date('j'), $year);
@@ -165,6 +151,30 @@ function cff_current_event_shortcode() {
     return '';
 }
 
-
 add_shortcode('cff_table', 'cff_render_table');
 add_shortcode('cff_today', 'cff_current_event_shortcode');
+
+// Admin Help Menu
+add_action('admin_menu', 'cff_add_admin_menu');
+function cff_add_admin_menu() {
+    add_options_page('CopticCal Help', 'CopticCal Help', 'manage_options', 'copticcal-help', 'cff_render_help_page');
+}
+function cff_render_help_page() {
+    if (!current_user_can('manage_options')) return;
+    ?>
+    <div class="wrap">
+        <h1>CopticCal Shortcode Assistance</h1>
+        <p>Use the shortcodes below to display Coptic fasts and feasts.</p>
+        <table class="form-table">
+            <tr>
+                <th scope="row"><code>[cff_table]</code></th>
+                <td>Full calendar table. Add <code>year="2025"</code> to show a specific year.</td>
+            </tr>
+            <tr>
+                <th scope="row"><code>[cff_today]</code></th>
+                <td>Shows today's event name only.</td>
+            </tr>
+        </table>
+    </div>
+    <?php
+}
