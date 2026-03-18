@@ -99,22 +99,42 @@ function cff_calculate_events($year) {
     return $events;
 }
 function cff_render_table($atts) {
-    // FIXED: Safely handle missing attributes to prevent PHP 8+ errors
+    // 1. Set the default year from the shortcode attribute or current year
     $atts = shortcode_atts(['year' => date("Y")], $atts);
     $year = intval($atts['year']);
     
+    // 2. Check if the user has submitted a new year via the input box
+    if (isset($_POST['cff_year']) && intval($_POST['cff_year']) > 0) {
+        $year = intval($_POST['cff_year']);
+    }
+
+    // 3. Calculate the events for the determined year
     $events = cff_calculate_events($year);
 
-    // FIXED: Initialized $output without the '.'
-    $output = "<table class='cff-table'>"; 
-    $output .= "<thead><tr><th>Fast or Feast</th><th>Date</th></tr></thead><tbody>";
+    // 4. Build the output (Form + Table)
+    $output = "<div class='cff-calendar-container'>";
+    
+    // The Year Input Form
+    $output .= "<form method='POST' action='' class='cff-year-form' style='margin-bottom: 20px;'>";
+    $output .= "<label for='cff_year_input'><strong>Select Year: </strong></label>";
+    $output .= "<input type='number' id='cff_year_input' name='cff_year' value='" . esc_attr($year) . "' required min='1900' max='2200' style='width: 100px; padding: 5px; margin-right: 10px;'>";
+    $output .= "<button type='submit' style='padding: 5px 15px;'>Generate Calendar</button>";
+    $output .= "</form>";
+
+    // The Calendar Table
+    $output .= "<table class='cff-table' style='width: 100%; text-align: left; border-collapse: collapse;'>";
+    // Appended the selected year to the header so the user knows what they are looking at
+    $output .= "<thead><tr><th style='border-bottom: 2px solid #ccc; padding-bottom: 10px;'>Fast or Feast ($year)</th><th style='border-bottom: 2px solid #ccc; padding-bottom: 10px;'>Date</th></tr></thead>";
+    $output .= "<tbody>";
 
     foreach ($events as [$name, $date]) {
         $formatted = is_array($date) ? cff_format_range($date[0], $date[1]) : cff_format_date($date);
-        $output .= "<tr><td>$name</td><td>$formatted</td></tr>";
+        $output .= "<tr><td style='border-bottom: 1px solid #eee; padding: 8px 0;'>$name</td><td style='border-bottom: 1px solid #eee; padding: 8px 0;'>$formatted</td></tr>";
     }
 
     $output .= "</tbody></table>";
+    $output .= "</div>";
+
     return $output;
 }
 function cff_current_event_shortcode() {
