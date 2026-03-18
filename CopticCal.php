@@ -55,6 +55,8 @@ function cff_calculate_events($year) {
     $jonah_feast = strtotime("+3 days", $jonah_fast_start);
     
     $events = [
+        // ADDED: Continuation of the Nativity fast from the previous year
+        ["The Holy Nativity Fast", [mktime(0, 0, 0, 1, 1, $year), mktime(0, 0, 0, 1, 6, $year)]],
         ["The Holy Nativity Feast", $leap ? [mktime(0, 0, 0, 1, 7, $year), mktime(0, 0, 0, 1, 8, $year)] : mktime(0, 0, 0, 1, 7, $year)],
         ["The Circumcision Feast", mktime(0, 0, 0, 1, $leap ? 15 : 14, $year)],
         ["The Holy Epiphany", mktime(0, 0, 0, 1, $leap ? 20 : 19, $year)],
@@ -90,17 +92,21 @@ function cff_calculate_events($year) {
     usort($events, function($a, $b) {
         $dateA = is_array($a[1]) ? $a[1][0] : $a[1];
         $dateB = is_array($b[1]) ? $b[1][0] : $b[1];
-        return $dateA - $dateB;
+        // FIXED: Using spaceship operator for safer comparison
+        return $dateA <=> $dateB; 
     });
 
     return $events;
 }
-
 function cff_render_table($atts) {
-    $year = isset($atts['year']) ? intval($atts['year']) : intval(date("Y"));
+    // FIXED: Safely handle missing attributes to prevent PHP 8+ errors
+    $atts = shortcode_atts(['year' => date("Y")], $atts);
+    $year = intval($atts['year']);
+    
     $events = cff_calculate_events($year);
 
-    $output .= "<table class='cff-table'>";
+    // FIXED: Initialized $output without the '.'
+    $output = "<table class='cff-table'>"; 
     $output .= "<thead><tr><th>Fast or Feast</th><th>Date</th></tr></thead><tbody>";
 
     foreach ($events as [$name, $date]) {
@@ -111,7 +117,6 @@ function cff_render_table($atts) {
     $output .= "</tbody></table>";
     return $output;
 }
-
 function cff_current_event_shortcode() {
     $year = (int)date('Y');
     $today = mktime(0, 0, 0, date('n'), date('j'), $year);
