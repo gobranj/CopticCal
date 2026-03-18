@@ -31,7 +31,6 @@ function cff_format_date($timestamp) {
     return date("F j", $timestamp);
 }
 
-// FIXED: Correctly handles ranges spanning multiple months
 function cff_format_range($start, $end) {
     if (date("F", $start) === date("F", $end)) {
         return date("F j", $start) . "–" . date("j", $end);
@@ -48,7 +47,7 @@ function cff_calculate_events($year) {
     $great_fast_start = strtotime("-55 days", $pascha);
 
     $events = [
-        ["The Holy Nativity Fast", [mktime(0, 0, 0, 1, 1, $year), mktime(0, 0, 0, 1, 6, $year)]],
+        ["The Holy Nativity Fast (Cont.)", [mktime(0, 0, 0, 1, 1, $year), mktime(0, 0, 0, 1, 6, $year)]],
         ["The Holy Nativity Feast", $leap ? [mktime(0, 0, 0, 1, 7, $year), mktime(0, 0, 0, 1, 8, $year)] : mktime(0, 0, 0, 1, 7, $year)],
         ["The Circumcision Feast", mktime(0, 0, 0, 1, $leap ? 15 : 14, $year)],
         ["The Holy Epiphany", mktime(0, 0, 0, 1, $leap ? 20 : 19, $year)],
@@ -144,8 +143,6 @@ function cff_render_table($atts) {
 
         $output .= "<tr style='$style'>";
         $output .= "<td style='padding:8px; text-align: left;'>$name " . ($is_today ? "⭐" : "") . "</td>";
-        
-        // FIXED: Using cff_format_range to properly handle multi-month ranges
         $formatted_date = is_array($date) ? cff_format_range($date[0], $date[1]) : cff_format_date($date);
         $output .= "<td style='padding:8px; text-align: left;'>$formatted_date</td>";
         $output .= "</tr>";
@@ -154,14 +151,13 @@ function cff_render_table($atts) {
     return $output;
 }
 
-function cff_render_next_event() {
+// [cff_next] - Always shows the upcoming event
+function cff_render_next_shortcode() {
     $events = cff_calculate_events(date('Y'));
     $today = strtotime('today');
     
     foreach ($events as [$name, $date]) {
-        $start = is_array($date) ? $date[0] : $date;
         $end = is_array($date) ? $date[1] : $date;
-        // If the event is happening now or in the future
         if ($end >= $today) {
             $formatted_date = is_array($date) ? cff_format_range($date[0], $date[1]) : cff_format_date($date);
             return "<div class='cff-next'><strong>Coming Up:</strong> $name ($formatted_date)</div>";
@@ -170,58 +166,52 @@ function cff_render_next_event() {
     return "";
 }
 
-add_shortcode('cff_table', 'cff_render_table');
-add_shortcode('cff_next', 'cff_render_next_event');
-add_shortcode('cff_today', 'cff_render_next_event'); // Aliasing today to next event for better UX
+// [cff_today] - Shows ONLY if something is happening right now
+function cff_render_today_shortcode() {
+    $events = cff_calculate_events(date('Y'));
+    $today = strtotime('today');
+    $active = [];
 
-/**
- * GITHUB UPDATE CHECKER
- * This tells WordPress to check your GitHub repo for a new version tag.
- */
-add_filter('site_transient_update_plugins', 'cff_push_update');
-
-function cff_push_update($transient) {
-    if (empty($transient->checked)) {
-        return $transient;
+    foreach ($events as [$name, $date]) {
+        $start = is_array($date) ? $date[0] : $date;
+        $end = is_array($date) ? $date[1] : $date;
+        if ($today >= $start && $today <= $end) {
+            $active[] = $name;
+        }
     }
+    return !empty($active) ? "<span class='cff-today'>" . implode(", ", $active) . "</span>" : "";
+}
 
-    // CONFIGURATION
+add_shortcode('cff_table', 'cff_render_table');
+add_shortcode('cff_next', 'cff_render_next_shortcode');
+add_shortcode('cff_today', 'cff_render_today_shortcode');
+
+// --- 5. GITHUB UPDATER ---
+
+add_filter('site_transient_update_plugins', 'cff_push_update');
+function cff_push_update($transient) {
+    if (empty($transient->checked)) return $transient;
+
     $username = 'gobranj';
     $repo     = 'CopticCal';
     $plugin_slug = plugin_basename(__FILE__);
 
-    // 1. Get the latest release from GitHub API
     $url = "https://api.github.com/repos/$username/$repo/releases/latest";
-    $args = array(
-        'timeout' => 10,
-        'headers' => array(
-            'Accept' => 'application/vnd.github.v3+json',
-            'User-Agent' => 'WordPress-CopticCal-Update-Checker'
-        )
-    );
+    $response = wp_remote_get($url, ['timeout' => 10, 'headers' => ['Accept' => 'application/vnd.github.v3+json', 'User-Agent' => 'WP-Update-Checker']]);
 
-    $response = wp_remote_get($url, $args);
-
-    if (is_wp_error($response) || wp_remote_retrieve_response_code($response) !== 200) {
-        return $transient;
-    }
+    if (is_wp_error($response) || wp_remote_retrieve_response_code($response) !== 200) return $transient;
 
     $release = json_decode(wp_remote_retrieve_body($response));
-
-    // 2. Compare versions
-    // GitHub tag should be something like "1.4"
     $new_version = ltrim($release->tag_name, 'v'); 
-    $current_version = '1.3'; // Make sure this matches your Plugin Header Version
+    $current_version = '1.0'; // Matches Plugin Header
 
     if (version_compare($current_version, $new_version, '<')) {
         $obj = new stdClass();
         $obj->slug = 'copticcal';
         $obj->new_version = $new_version;
         $obj->url = "https://github.com/$username/$repo";
-        $obj->package = $release->zipball_url; // The download link
-
+        $obj->package = $release->zipball_url;
         $transient->response[$plugin_slug] = $obj;
     }
-
     return $transient;
 }
