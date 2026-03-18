@@ -173,3 +173,55 @@ function cff_render_next_event() {
 add_shortcode('cff_table', 'cff_render_table');
 add_shortcode('cff_next', 'cff_render_next_event');
 add_shortcode('cff_today', 'cff_render_next_event'); // Aliasing today to next event for better UX
+
+/**
+ * GITHUB UPDATE CHECKER
+ * This tells WordPress to check your GitHub repo for a new version tag.
+ */
+add_filter('site_transient_update_plugins', 'cff_push_update');
+
+function cff_push_update($transient) {
+    if (empty($transient->checked)) {
+        return $transient;
+    }
+
+    // CONFIGURATION
+    $username = 'gobranj';
+    $repo     = 'CopticCal';
+    $plugin_slug = plugin_basename(__FILE__);
+
+    // 1. Get the latest release from GitHub API
+    $url = "https://api.github.com/repos/$username/$repo/releases/latest";
+    $args = array(
+        'timeout' => 10,
+        'headers' => array(
+            'Accept' => 'application/vnd.github.v3+json',
+            'User-Agent' => 'WordPress-CopticCal-Update-Checker'
+        )
+    );
+
+    $response = wp_remote_get($url, $args);
+
+    if (is_wp_error($response) || wp_remote_retrieve_response_code($response) !== 200) {
+        return $transient;
+    }
+
+    $release = json_decode(wp_remote_retrieve_body($response));
+
+    // 2. Compare versions
+    // GitHub tag should be something like "1.4"
+    $new_version = ltrim($release->tag_name, 'v'); 
+    $current_version = '1.3'; // Make sure this matches your Plugin Header Version
+
+    if (version_compare($current_version, $new_version, '<')) {
+        $obj = new stdClass();
+        $obj->slug = 'copticcal';
+        $obj->new_version = $new_version;
+        $obj->url = "https://github.com/$username/$repo";
+        $obj->package = $release->zipball_url; // The download link
+
+        $transient->response[$plugin_slug] = $obj;
+    }
+
+    return $transient;
+}
