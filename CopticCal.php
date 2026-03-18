@@ -2,7 +2,7 @@
 /*
 Plugin Name: CopticCal Pro
 Description: Coptic Calendar with event highlighting, "Next Event" display, and a custom settings menu.
-Version: 1.3
+Version: 1.0
 Author: Joseph Gobran
 */
 
