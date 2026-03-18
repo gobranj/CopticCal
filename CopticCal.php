@@ -1,6 +1,6 @@
 <?php
 /*
-Plugin Name: CopticCal Pro
+Plugin Name: CopticCal
 Description: Coptic Calendar with event highlighting, "Next Event" display, and a custom settings menu.
 Version: 1.0
 Author: Joseph Gobran
