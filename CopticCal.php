@@ -2,7 +2,7 @@
 /*
 Plugin Name: CopticCal
 Description: Coptic Calendar with event highlighting, "Next Event" display, and a custom settings menu.
-Version: 1.1
+Version: 1.0
 Author: Joseph Gobran
 */
 
@@ -203,7 +203,7 @@ function cff_push_update($transient) {
 
     $release = json_decode(wp_remote_retrieve_body($response));
     $new_version = ltrim($release->tag_name, 'v'); 
-    $current_version = '1.1'; // Matches Plugin Header
+    $current_version = '1.0'; // Matches Plugin Header
 
     if (version_compare($current_version, $new_version, '<')) {
         $obj = new stdClass();
