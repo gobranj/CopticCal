@@ -1,34 +1,49 @@
-CopticCal
-CopticCal is a WordPress plugin designed to calculate and display the liturgical fasts and feasts of the Coptic Orthodox Church. It features dynamic date calculations, event highlighting, and easy integration via shortcodes.
-Description
-This plugin provides a robust way to integrate a Coptic liturgical calendar into any WordPress site. It automatically calculates moveable feasts and fasts based on the Julian Easter date, accounts for both Gregorian and Coptic leap years, and includes a customizable settings menu for appearance.
-Features
- * Moveable Date Calculations: Automatically calculates dates for Jonah's Fast, Great Lent, Pascha, and more based on the year.
- * Event Highlighting: Visually highlights the current day's event in the table with a customizable background color and a star (⭐) indicator.
- * Custom Settings Page: Provides an administrative menu to change the "Today" highlight color.
- * Shortcode Powered: Easily place the full calendar, upcoming events, or today's specific event anywhere on your site.
- * GitHub Update Checker: Built-in logic to check for new releases directly from GitHub for easy updates.
-Installation
- * Download the CopticCal.php file.
- * Upload the file to your WordPress /wp-content/plugins/coptic-cal/ directory.
- * Activate the plugin through the 'Plugins' menu in WordPress.
-Shortcodes
-[cff_table]
-Displays the full calendar of fasts and feasts for the year.
- * Attribute: year (optional). Defaults to the current Gregorian year.
- * Example: [cff_table year="2025"]
-[cff_next]
-Always displays the very next upcoming event (or the current one if it hasn't ended yet).
- * Example: [cff_next]
-[cff_today]
-Displays the name of the event only if it is occurring exactly today. If no event is active, it returns an empty string.
- * Example: [cff_today]
-Configuration
-Navigate to Settings > CopticCal in your WordPress dashboard to customize the Highlight Today Color. This color will be applied to the row in the [cff_table] that corresponds to the current date.
-GitHub Updates
-The plugin is configured to check for updates from the GitHub repository gobranj/CopticCal. To push an update to your users:
- * Update the version number in the plugin header and the $current_version variable in the code.
- * Create a new Release on GitHub with a tag (e.g., v1.1) that matches your new version number.
-Author
- * Joseph Gobran
-Version 1.0
+# CopticCal
+
+**CopticCal** is a lightweight, efficient WordPress plugin designed to calculate and display the liturgical fasts and feasts of the Coptic Orthodox Church. It features dynamic date calculations, visual event highlighting, and easy integration via shortcodes.
+
+## 🚀 Features
+
+* **Moveable Date Logic**: Automatically calculates dates for Jonah's Fast, Great Lent, Pascha, and the Apostles' Fast based on the Gregorian year.
+* **Today Highlighting**: Automatically identifies the current day's event in the calendar table with a customizable background color and a star (⭐) indicator.
+* **Coming Up Section**: A dedicated shortcode to show the nearest upcoming feast or fast.
+* **GitHub Integration**: Built-in update checker that notifies you in WordPress when a new release is published to GitHub.
+* **Admin Customization**: A dedicated settings page to choose your preferred highlight color using a native color picker.
+
+## 🛠 Installation
+
+1.  Download the `CopticCal.php` file.
+2.  In your WordPress directory, navigate to `/wp-content/plugins/` and create a folder named `coptic-cal`.
+3.  Upload `CopticCal.php` into that folder.
+4.  Activate the plugin through the **Plugins** menu in your WordPress dashboard.
+
+## 📖 Shortcodes
+
+You can use the following shortcodes in any Post, Page, or Widget:
+
+| Shortcode | Description |
+| :--- | :--- |
+| `[cff_table]` | Displays the full liturgical calendar for the year. Defaults to the current year. |
+| `[cff_table year="2027"]` | Displays the calendar for a specific Gregorian year. |
+| `[cff_next]` | Shows the very next upcoming event and its date range. |
+| `[cff_today]` | Displays the name of the current event ONLY if one is happening today. |
+
+## ⚙️ Configuration
+
+To customize the look of your calendar:
+1.  Go to **Settings > CopticCal** in your WordPress Admin dashboard.
+2.  Use the **Highlight Today Color** picker to select a color that matches your site's theme.
+3.  Click **Save Changes**.
+
+## 👨‍💻 Developer & Updates
+
+This plugin is maintained by **Joseph Gobran**. 
+
+### Updating via GitHub
+To push updates to users:
+1.  Modify the code and update the `Version` in the file header and the `$current_version` variable in the GitHub Update logic.
+2.  Push your changes to the `gobranj/CopticCal` repository.
+3.  Create a new **Release** on GitHub with a tag matching your version number (e.g., `v1.1`).
+
+---
+*Version 1.0*
