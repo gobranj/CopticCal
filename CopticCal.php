@@ -160,7 +160,11 @@ function cff_render_next_shortcode() {
         $end = is_array($date) ? $date[1] : $date;
         if ($end >= $today) {
             $formatted_date = is_array($date) ? cff_format_range($date[0], $date[1]) : cff_format_date($date);
-            return "<div class='cff-next'><strong>Coming Up:</strong> $name ($formatted_date)</div>";
+            
+            // Return a clean string
+            return "<span class='cff-label' style='display:block; text-transform:uppercase; font-size:11px; font-weight:bold; opacity:0.7;'>Coming Up</span>
+                    <span class='cff-event-name' style='display:block; font-size:18px; font-weight:bold; margin: 5px 0;'>$name</span>
+                    <span class='cff-date' style='font-size:14px;'>$formatted_date</span>";
         }
     }
     return "";
@@ -255,3 +259,50 @@ function cff_push_update($transient) {
 
     return $transient;
 }
+
+/**
+ * --- 6. STYLED WIDGET ---
+ * A drag-and-drop widget for the sidebar/footer
+ */
+class CopticCal_Widget extends WP_Widget {
+
+    public function __construct() {
+        parent::__construct(
+            'coptic_cal_widget',
+            'CopticCal: Next Event',
+            ['description' => 'A styled block showing the upcoming Coptic event.']
+        );
+    }
+
+    public function widget($args, $instance) {
+        $highlight = get_option('cff_highlight_color', '#fff9c4');
+        $next_event_html = cff_render_next_shortcode();
+
+        if (empty($next_event_html)) return;
+
+        echo $args['before_widget'];
+        
+        // Styled Colored Block Output
+        echo "
+        <div class='cff-widget-block' style='
+            background-color: {$highlight};
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 5px solid rgba(0,0,0,0.1);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            color: #333;
+            margin-bottom: 20px;
+        '>";
+        
+        echo $next_event_html;
+        
+        echo "</div>";
+        
+        echo $args['after_widget'];
+    }
+}
+
+// Register the widget
+add_action('widgets_init', function() {
+    register_widget('CopticCal_Widget');
+});
