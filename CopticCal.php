@@ -2,7 +2,7 @@
 /*
 Plugin Name: CopticCal
 Description: Coptic Calendar with event highlighting, "Next Event" display, and a custom settings menu.
-Version: 1.0
+Version: 1.0.1
 Author: Joseph Gobran
 */
 
@@ -47,7 +47,7 @@ function cff_calculate_events($year) {
     $great_fast_start = strtotime("-55 days", $pascha);
 
     $events = [
-        ["The Holy Nativity Fast (Cont.)", [mktime(0, 0, 0, 1, 1, $year), mktime(0, 0, 0, 1, 6, $year)]],
+        ["The Holy Nativity Fast", [mktime(0, 0, 0, 1, 1, $year), mktime(0, 0, 0, 1, 6, $year)]],
         ["The Holy Nativity Feast", $leap ? [mktime(0, 0, 0, 1, 7, $year), mktime(0, 0, 0, 1, 8, $year)] : mktime(0, 0, 0, 1, 7, $year)],
         ["The Circumcision Feast", mktime(0, 0, 0, 1, $leap ? 15 : 14, $year)],
         ["The Holy Epiphany", mktime(0, 0, 0, 1, $leap ? 20 : 19, $year)],
