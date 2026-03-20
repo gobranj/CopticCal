@@ -193,18 +193,24 @@ add_filter('site_transient_update_plugins', 'cff_push_update');
 function cff_push_update($transient) {
     if (empty($transient->checked)) return $transient;
 
+    // 1. Ensure the required WordPress function exists
+    if (!function_exists('get_plugin_data')) {
+        require_once(ABSPATH . 'wp-admin/includes/plugin.php');
+    }
+
     $username = 'gobranj';
     $repo = 'CopticCal';
-    $plugin_slug = plugin_basename(__FILE__);
-    $current_version = get_plugin_data(__FILE__)['Version'];
+    $plugin_file = __FILE__;
+    $plugin_slug = plugin_basename($plugin_file);
     
-    // Use transient caching to avoid excessive API calls
+    // 2. Automatically get version from the Plugin Header (top of this file)
+    $plugin_data = get_plugin_data($plugin_file);
+    $current_version = $plugin_data['Version'];
+    
     $cache_key = 'cff_github_update_cache';
-    $cached_data = get_transient($cache_key);
+    $release = get_transient($cache_key);
     
-    if ($cached_data !== false) {
-        $release = $cached_data;
-    } else {
+    if ($release === false) {
         $url = "https://api.github.com/repos/$username/$repo/releases/latest";
         $response = wp_remote_get($url, [
             'timeout' => 10,
@@ -214,34 +220,22 @@ function cff_push_update($transient) {
             ]
         ]);
 
-        if (is_wp_error($response)) {
-            error_log('CopticCal Update Check Error: ' . $response->get_error_message());
-            return $transient;
-        }
-
-        $status_code = wp_remote_retrieve_response_code($response);
-        if ($status_code !== 200) {
-            error_log('CopticCal Update Check Failed: HTTP ' . $status_code);
+        if (is_wp_error($response) || wp_remote_retrieve_response_code($response) !== 200) {
             return $transient;
         }
 
         $release = json_decode(wp_remote_retrieve_body($response));
-        if (json_last_error() !== JSON_ERROR_NONE) {
-            error_log('CopticCal Update Check: Invalid JSON response');
+        
+        if (json_last_error() === JSON_ERROR_NONE && !empty($release->tag_name)) {
+            set_transient($cache_key, $release, 12 * HOUR_IN_SECONDS);
+        } else {
             return $transient;
         }
-
-        // Cache for 12 hours
-        set_transient($cache_key, $release, 12 * HOUR_IN_SECONDS);
-    }
-
-    if (empty($release->tag_name) || empty($release->zipball_url)) {
-        error_log('CopticCal Update Check: Missing release data');
-        return $transient;
     }
 
     $new_version = ltrim($release->tag_name, 'v');
 
+    // 3. Compare versions
     if (version_compare($current_version, $new_version, '<')) {
         $update_obj = new stdClass();
         $update_obj->slug = 'copticcal';
@@ -249,22 +243,15 @@ function cff_push_update($transient) {
         $update_obj->new_version = $new_version;
         $update_obj->url = "https://github.com/$username/$repo";
         $update_obj->package = $release->zipball_url;
-        $update_obj->tested = '6.4';  // Update as needed
-        $update_obj->requires = '5.0';
-        $update_obj->requires_php = '7.4';
         
-        if (!empty($release->body)) {
-            $update_obj->upgrade_notice = $release->body;
-        }
+        // Metadata for the "View Details" popup
+        $update_obj->sections = [
+            'description' => $plugin_data['Description'],
+            'changelog'   => !empty($release->body) ? wp_kses_post($release->body) : 'Check GitHub for release notes.'
+        ];
 
         $transient->response[$plugin_slug] = $update_obj;
     }
 
     return $transient;
-}
-
-// Clear update cache when plugin is updated
-add_action('upgrader_process_complete', 'cff_clear_update_cache');
-function cff_clear_update_cache($upgrader_object) {
-    delete_transient('cff_github_update_cache');
 }
