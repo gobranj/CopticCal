@@ -1,10 +1,12 @@
 <?php
 /*
 Plugin Name: CopticCal
-Description: Coptic Calendar with event highlighting, "Next Event" display, and a custom settings menu.
-Version: 1.0.1
+Description: Coptic Calendar with GitHub updates, elementor integration, and granular styling for Headers, Body, and Highlights.
+Version: 1.1.0
 Author: Joseph Gobran
 */
+
+if ( ! defined( 'ABSPATH' ) ) exit;
 
 // --- 1. CORE CALCULATIONS ---
 
@@ -17,9 +19,7 @@ function cff_is_coptic_leap($coptic_year) {
 }
 
 function cff_julian_easter($year) {
-    $a = $year % 4;
-    $b = $year % 7;
-    $c = $year % 19;
+    $a = $year % 4; $b = $year % 7; $c = $year % 19;
     $d = (19 * $c + 15) % 30;
     $e = (2 * $a + 4 * $b - $d + 34) % 7;
     $month = floor(($d + $e + 114) / 31);
@@ -32,11 +32,9 @@ function cff_format_date($timestamp) {
 }
 
 function cff_format_range($start, $end) {
-    if (date("F", $start) === date("F", $end)) {
-        return date("F j", $start) . "–" . date("j", $end);
-    } else {
-        return date("F j", $start) . " – " . date("F j", $end);
-    }
+    return (date("F", $start) === date("F", $end)) 
+        ? date("F j", $start) . "–" . date("j", $end) 
+        : date("F j", $start) . " – " . date("F j", $end);
 }
 
 function cff_calculate_events($year) {
@@ -71,7 +69,7 @@ function cff_calculate_events($year) {
         ["Entry of the Lord into Egypt", mktime(0, 0, 0, 6, 1, $year)],
         ["The Holy Pentecost Feast", strtotime("+49 days", $pascha)],
         ["The Apostles' Fast", [strtotime("+50 days", $pascha), mktime(0, 0, 0, 7, 11, $year)]],
-        ["The Apostles' Feast (Martyrdom of St. Peter & St. Paul)", mktime(0, 0, 0, 7, 12, $year)],
+        ["The Apostles' Fast (Martyrdom of St. Peter & St. Paul)", mktime(0, 0, 0, 7, 12, $year)],
         ["St. Mary's Fast", [mktime(0, 0, 0, 8, 7, $year), mktime(0, 0, 0, 8, 21, $year)]],
         ["Transfiguration Feast", mktime(0, 0, 0, 8, 19, $year)],
         ["Assumption of St. Mary's Body", mktime(0, 0, 0, 8, 22, $year)],
@@ -88,18 +86,16 @@ function cff_calculate_events($year) {
     return $events;
 }
 
-// --- 2. SETTINGS PAGE ---
+// --- 2. SETTINGS ---
 
-add_action('admin_init', 'cff_settings_init');
-function cff_settings_init() {
+add_action('admin_init', function() {
     register_setting('cff_settings', 'cff_highlight_color');
-    add_option('cff_highlight_color', '#fff9c4'); 
-}
+    if (false === get_option('cff_highlight_color')) add_option('cff_highlight_color', '#fff9c4');
+});
 
-add_action('admin_menu', 'cff_add_admin_menu');
-function cff_add_admin_menu() {
+add_action('admin_menu', function() {
     add_options_page('CopticCal Settings', 'CopticCal', 'manage_options', 'copticcal', 'cff_render_settings');
-}
+});
 
 function cff_render_settings() {
     ?>
@@ -108,10 +104,7 @@ function cff_render_settings() {
         <form action="options.php" method="post">
             <?php settings_fields('cff_settings'); ?>
             <table class="form-table">
-                <tr>
-                    <th scope="row">Highlight Today Color</th>
-                    <td><input type="color" name="cff_highlight_color" value="<?php echo esc_attr(get_option('cff_highlight_color')); ?>"></td>
-                </tr>
+                <tr><th>Highlight Today Color</th><td><input type="color" name="cff_highlight_color" value="<?php echo esc_attr(get_option('cff_highlight_color')); ?>"></td></tr>
             </table>
             <?php submit_button(); ?>
         </form>
@@ -119,49 +112,41 @@ function cff_render_settings() {
     <?php
 }
 
-// --- 3. RENDERING ---
+// --- 3. RENDERING ENGINE ---
 
 function cff_render_table($atts) {
     $atts = shortcode_atts(['year' => date("Y")], $atts);
     $year = intval($atts['year']);
     $events = cff_calculate_events($year);
     $today = strtotime('today');
-    $highlight = get_option('cff_highlight_color');
+    $highlight_bg = get_option('cff_highlight_color');
 
-    $output = "<table style='width: 100%; border-collapse: collapse; text-align: left;'>";
-    $output .= "<thead><tr style='border-bottom: 2px solid #ccc;'>
-                <th style='padding:10px; text-align: left;'>Fast or Feast ($year)</th>
-                <th style='padding:10px; text-align: left;'>Date</th>
-                </tr></thead><tbody>";
+    $output = "<div class='cff-table-container'><table class='cff-cal-table'>";
+    $output .= "<thead><tr><th>Event ($year)</th><th>Date</th></tr></thead><tbody>";
 
     foreach ($events as [$name, $date]) {
         $start = is_array($date) ? $date[0] : $date;
         $end = is_array($date) ? $date[1] : $date;
-        
         $is_today = ($today >= $start && $today <= $end);
-        $style = $is_today ? "background-color: $highlight; font-weight: bold;" : "border-bottom: 1px solid #eee;";
+        
+        // Use a class instead of inline styles for elementor to target
+        $row_class = $is_today ? "cff-row-today" : "cff-row-standard";
 
-        $output .= "<tr style='$style'>";
-        $output .= "<td style='padding:8px; text-align: left;'>$name " . ($is_today ? "⭐" : "") . "</td>";
+        $output .= "<tr class='$row_class'>";
+        $output .= "<td>$name " . ($is_today ? "⭐" : "") . "</td>";
         $formatted_date = is_array($date) ? cff_format_range($date[0], $date[1]) : cff_format_date($date);
-        $output .= "<td style='padding:8px; text-align: left;'>$formatted_date</td>";
-        $output .= "</tr>";
+        $output .= "<td>$formatted_date</td></tr>";
     }
-    $output .= "</tbody></table>";
+    $output .= "</tbody></table></div><style>.cff-cal-table{width:100%;border-collapse:collapse;}.cff-cal-table th, .cff-cal-table td{padding:12px;text-align:left;}.cff-row-today{background-color:$highlight_bg;font-weight:bold;}</style>";
     return $output;
 }
 
-// [cff_next] - Always shows the upcoming event
 function cff_render_next_shortcode() {
     $events = cff_calculate_events(date('Y'));
     $today = strtotime('today');
-    
     foreach ($events as [$name, $date]) {
-        $end = is_array($date) ? $date[1] : $date;
-        if ($end >= $today) {
+        if ((is_array($date) ? $date[1] : $date) >= $today) {
             $formatted_date = is_array($date) ? cff_format_range($date[0], $date[1]) : cff_format_date($date);
-            
-            // Return a clean string
             return "<span class='cff-label' style='display:block; text-transform:uppercase; font-size:11px; font-weight:bold; opacity:0.7;'>Coming Up</span>
                     <span class='cff-event-name' style='display:block; font-size:18px; font-weight:bold; margin: 5px 0;'>$name</span>
                     <span class='cff-date' style='font-size:14px;'>$formatted_date</span>";
@@ -170,139 +155,110 @@ function cff_render_next_shortcode() {
     return "";
 }
 
-// [cff_today] - Shows ONLY if something is happening right now
-function cff_render_today_shortcode() {
-    $events = cff_calculate_events(date('Y'));
-    $today = strtotime('today');
-    $active = [];
-
-    foreach ($events as [$name, $date]) {
-        $start = is_array($date) ? $date[0] : $date;
-        $end = is_array($date) ? $date[1] : $date;
-        if ($today >= $start && $today <= $end) {
-            $active[] = $name;
-        }
-    }
-    return !empty($active) ? "<span class='cff-today'>" . implode(", ", $active) . "</span>" : "";
-}
-
 add_shortcode('cff_table', 'cff_render_table');
 add_shortcode('cff_next', 'cff_render_next_shortcode');
-add_shortcode('cff_today', 'cff_render_today_shortcode');
 
-
-// --- 5. GITHUB UPDATER ---
+// --- 4. GITHUB UPDATER ---
 
 add_filter('site_transient_update_plugins', 'cff_push_update');
 function cff_push_update($transient) {
     if (empty($transient->checked)) return $transient;
-
-    // 1. Ensure the required WordPress function exists
-    if (!function_exists('get_plugin_data')) {
-        require_once(ABSPATH . 'wp-admin/includes/plugin.php');
-    }
-
+    if (!function_exists('get_plugin_data')) require_once(ABSPATH . 'wp-admin/includes/plugin.php');
     $username = 'gobranj';
     $repo = 'CopticCal';
     $plugin_file = __FILE__;
     $plugin_slug = plugin_basename($plugin_file);
-    
-    // 2. Automatically get version from the Plugin Header (top of this file)
     $plugin_data = get_plugin_data($plugin_file);
-    $current_version = $plugin_data['Version'];
-    
     $cache_key = 'cff_github_update_cache';
     $release = get_transient($cache_key);
     
     if ($release === false) {
         $url = "https://api.github.com/repos/$username/$repo/releases/latest";
-        $response = wp_remote_get($url, [
-            'timeout' => 10,
-            'headers' => [
-                'Accept' => 'application/vnd.github.v3+json',
-                'User-Agent' => 'CopticCal-Plugin'
-            ]
-        ]);
-
-        if (is_wp_error($response) || wp_remote_retrieve_response_code($response) !== 200) {
-            return $transient;
-        }
-
+        $response = wp_remote_get($url, ['timeout' => 10, 'headers' => ['Accept' => 'application/vnd.github.v3+json', 'User-Agent' => 'CopticCal-Plugin']]);
+        if (is_wp_error($response) || wp_remote_retrieve_response_code($response) !== 200) return $transient;
         $release = json_decode(wp_remote_retrieve_body($response));
-        
         if (json_last_error() === JSON_ERROR_NONE && !empty($release->tag_name)) {
             set_transient($cache_key, $release, 12 * HOUR_IN_SECONDS);
-        } else {
-            return $transient;
-        }
+        } else { return $transient; }
     }
-
     $new_version = ltrim($release->tag_name, 'v');
-
-    // 3. Compare versions
-    if (version_compare($current_version, $new_version, '<')) {
+    if (version_compare($plugin_data['Version'], $new_version, '<')) {
         $update_obj = new stdClass();
         $update_obj->slug = 'copticcal';
         $update_obj->plugin = $plugin_slug;
         $update_obj->new_version = $new_version;
         $update_obj->url = "https://github.com/$username/$repo";
         $update_obj->package = $release->zipball_url;
-        
-        // Metadata for the "View Details" popup
-        $update_obj->sections = [
-            'description' => $plugin_data['Description'],
-            'changelog'   => !empty($release->body) ? wp_kses_post($release->body) : 'Check GitHub for release notes.'
-        ];
-
+        $update_obj->sections = ['description' => $plugin_data['Description'], 'changelog' => !empty($release->body) ? wp_kses_post($release->body) : 'Check GitHub for updates.'];
         $transient->response[$plugin_slug] = $update_obj;
     }
-
     return $transient;
 }
 
-/**
- * --- 6. STYLED WIDGET ---
- * A drag-and-drop widget for the sidebar/footer
- */
-class CopticCal_Widget extends WP_Widget {
+// --- 5. ELEMENTOR WIDGETS ---
 
-    public function __construct() {
-        parent::__construct(
-            'coptic_cal_widget',
-            'CopticCal: Next Event',
-            ['description' => 'A styled block showing the upcoming Coptic event.']
-        );
+add_action('elementor/widgets/register', function($widgets_manager) {
+
+    // 1. Table Widget with Granular Styling
+    class Elementor_Coptic_Full_Table extends \Elementor\Widget_Base {
+        public function get_name() { return 'cff_full_table'; }
+        public function get_title() { return 'Coptic: Full Table'; }
+        public function get_icon() { return 'eicon-table'; }
+        public function get_categories() { return [ 'general' ]; }
+
+        protected function register_controls() {
+            // CONTENT
+            $this->start_controls_section('content_sec', ['label' => 'Settings']);
+            $this->add_control('use_current_year', ['label' => 'Current Year', 'type' => \Elementor\Controls_Manager::SWITCHER, 'default' => 'yes']);
+            $this->add_control('manual_year', ['label' => 'Year', 'type' => \Elementor\Controls_Manager::NUMBER, 'default' => date('Y'), 'condition' => ['use_current_year' => '']]);
+            $this->end_controls_section();
+
+            // HEADER STYLE
+            $this->start_controls_section('header_style', ['label' => 'Header Row', 'tab' => \Elementor\Controls_Manager::TAB_STYLE]);
+            $this->add_control('h_bg', ['label' => 'Background', 'type' => \Elementor\Controls_Manager::COLOR, 'selectors' => ['{{WRAPPER}} .cff-cal-table thead tr' => 'background-color: {{VALUE}};']]);
+            $this->add_control('h_color', ['label' => 'Text Color', 'type' => \Elementor\Controls_Manager::COLOR, 'selectors' => ['{{WRAPPER}} .cff-cal-table th' => 'color: {{VALUE}};']]);
+            $this->add_group_control(\Elementor\Group_Control_Typography::get_type(), ['name' => 'h_typo', 'selector' => '{{WRAPPER}} .cff-cal-table th']);
+            $this->end_controls_section();
+
+            // BODY STYLE
+            $this->start_controls_section('body_style', ['label' => 'Body Rows', 'tab' => \Elementor\Controls_Manager::TAB_STYLE]);
+            $this->add_control('b_color', ['label' => 'Text Color', 'type' => \Elementor\Controls_Manager::COLOR, 'selectors' => ['{{WRAPPER}} .cff-row-standard td' => 'color: {{VALUE}};']]);
+            $this->add_group_control(\Elementor\Group_Control_Typography::get_type(), ['name' => 'b_typo', 'selector' => '{{WRAPPER}} .cff-row-standard td']);
+            $this->add_control('b_border', ['label' => 'Border Color', 'type' => \Elementor\Controls_Manager::COLOR, 'selectors' => ['{{WRAPPER}} .cff-cal-table td' => 'border-bottom: 1px solid {{VALUE}};']]);
+            $this->end_controls_section();
+
+            // HIGHLIGHT STYLE
+            $this->start_controls_section('today_style', ['label' => 'Today Highlight', 'tab' => \Elementor\Controls_Manager::TAB_STYLE]);
+            $this->add_control('t_bg', ['label' => 'Background', 'type' => \Elementor\Controls_Manager::COLOR, 'selectors' => ['{{WRAPPER}} .cff-row-today' => 'background-color: {{VALUE}} !important;']]);
+            $this->add_control('t_color', ['label' => 'Text Color', 'type' => \Elementor\Controls_Manager::COLOR, 'selectors' => ['{{WRAPPER}} .cff-row-today td' => 'color: {{VALUE}};']]);
+            $this->add_group_control(\Elementor\Group_Control_Typography::get_type(), ['name' => 't_typo', 'selector' => '{{WRAPPER}} .cff-row-today td']);
+            $this->end_controls_section();
+        }
+
+        protected function render() {
+            $settings = $this->get_settings_for_display();
+            $year = ($settings['use_current_year'] === 'yes') ? date('Y') : $settings['manual_year'];
+            echo cff_render_table(['year' => $year]);
+        }
     }
 
-    public function widget($args, $instance) {
-        $highlight = get_option('cff_highlight_color', '#fff9c4');
-        $next_event_html = cff_render_next_shortcode();
-
-        if (empty($next_event_html)) return;
-
-        echo $args['before_widget'];
-        
-        // Styled Colored Block Output
-        echo "
-        <div class='cff-widget-block' style='
-            background-color: {$highlight};
-            padding: 20px;
-            border-radius: 8px;
-            border-left: 5px solid rgba(0,0,0,0.1);
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-            color: #333;
-            margin-bottom: 20px;
-        '>";
-        
-        echo $next_event_html;
-        
-        echo "</div>";
-        
-        echo $args['after_widget'];
+    // 2. Next Event Widget
+    class Elementor_Coptic_Next_Event extends \Elementor\Widget_Base {
+        public function get_name() { return 'cff_next_event'; }
+        public function get_title() { return 'Coptic: Next Event'; }
+        public function get_icon() { return 'eicon-calendar'; }
+        public function get_categories() { return [ 'general' ]; }
+        protected function register_controls() {
+            $this->start_controls_section('style', ['label' => 'Style', 'tab' => \Elementor\Controls_Manager::TAB_STYLE]);
+            $this->add_control('bg', ['label' => 'Background', 'type' => \Elementor\Controls_Manager::COLOR, 'selectors' => ['{{WRAPPER}} .cff-card' => 'background-color: {{VALUE}};']]);
+            $this->add_group_control(\Elementor\Group_Control_Typography::get_type(), ['name' => 'typo', 'selector' => '{{WRAPPER}} .cff-card']);
+            $this->end_controls_section();
+        }
+        protected function render() {
+            echo "<div class='cff-card' style='padding:20px; border-radius:10px; border-left:5px solid rgba(0,0,0,0.1);'>" . cff_render_next_shortcode() . "</div>";
+        }
     }
-}
 
-// Register the widget
-add_action('widgets_init', function() {
-    register_widget('CopticCal_Widget');
+    $widgets_manager->register(new Elementor_Coptic_Full_Table());
+    $widgets_manager->register(new Elementor_Coptic_Next_Event());
 });
