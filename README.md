@@ -38,12 +38,3 @@ To customize the look of your calendar:
 ## 👨‍💻 Developer & Updates
 
 This plugin is maintained by **Joseph Gobran**. 
-
-### Updating via GitHub
-To push updates to users:
-1.  Modify the code and update the `Version` in the file header and the `$current_version` variable in the GitHub Update logic.
-2.  Push your changes to the `gobranj/CopticCal` repository.
-3.  Create a new **Release** on GitHub with a tag matching your version number (e.g., `v1.1`).
-
----
-*Version 1.0*
